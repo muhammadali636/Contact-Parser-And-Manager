@@ -1,0 +1,11 @@
+version: '3'
+services:
+  cis2750:
+    tty: true
+    user: socs
+    hostname: cis2750
+    image: socsguelph/cis2750:w25
+    ports: 
+      - "22"
+    volumes:
+      - ./:/home/socs/workdir
