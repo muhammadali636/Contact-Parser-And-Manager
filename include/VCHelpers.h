@@ -1,7 +1,5 @@
 /*
     VCHelpers.h
-    Name: Muhammad Ali
-    Student ID: 1115336
 */
 
 #include <stdbool.h>
