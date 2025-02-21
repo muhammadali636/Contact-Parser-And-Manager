@@ -1,12 +1,106 @@
 /*
-* VCParser.c
-* Primary Parsing Functions
+    VCParser.c
+    Name: Muhammad Ali
+    Student ID: 1115336
 */
 
 //header files
 #include "VCParser.h" //also contains LinkedListAPI.h
 #include "VCHelpers.h"
 
+//takes a Card object and saves it to a file in vCard format. Avoid calling cardToString because we need to serialize the Card.
+VCardErrorCode writeCard(const char* fileName, const Card* obj) {
+    //validate args
+    if (fileName == NULL || obj == NULL) {
+        return INV_CARD;
+    }
+
+    //open file
+    FILE* fp = fopen(fileName, "w");
+    if (fp == NULL) {
+        return WRITE_ERROR;  //couldn't open file for writing
+    }
+
+    //Card must haveFN with at least one value
+    if (obj->fn == NULL || getLength(obj->fn->values) == 0) {
+        fclose(fp);
+        return INV_CARD;
+    }
+
+    //write vCard lines (using fprintf, with \r\n line endings)
+    if (fprintf(fp, "BEGIN:VCARD\r\n") < 0) {
+        fclose(fp);
+        return WRITE_ERROR;
+    }
+
+    //Write VERSION line 4.0
+    if (fprintf(fp, "VERSION:4.0\r\n") < 0) {
+        fclose(fp);
+        return WRITE_ERROR;
+    }
+
+    //Write FN property
+    char* fnValueString = (char*)getFromFront(obj->fn->values);
+    //if fn is empty INVALID
+    if (fnValueString == NULL || strcmp(fnValueString, "") == 0) {
+        fclose(fp);
+        return INV_CARD;
+    }
+    if (fprintf(fp, "FN:%s\r\n", fnValueString) < 0) {
+        fclose(fp);
+        return WRITE_ERROR;
+    }
+
+    //optional properties
+    ListIterator propIter = createIterator(obj->optionalProperties);
+    Property* prop = NULL;
+    while ((prop = (Property*)nextElement(&propIter)) != NULL) {
+        char* propStr = propertyToString(prop);
+        if (propStr != NULL) {
+            if (fprintf(fp, "%s\r\n", propStr) < 0) {
+                free(propStr);
+                fclose(fp);
+                return WRITE_ERROR;
+            }
+            free(propStr);
+        }
+    }
+
+    //Write birthday (if existing)
+    if (obj->birthday != NULL) {
+        char* bdayStr = dateToString(obj->birthday);
+        if (bdayStr != NULL && strcmp(bdayStr, "") != 0) {
+            if (fprintf(fp, "BDAY:%s\r\n", bdayStr) < 0) {
+                free(bdayStr);
+                fclose(fp);
+                return WRITE_ERROR;
+            }
+            free(bdayStr);
+        }
+    }
+
+    //write Anniversary (if existing)
+    if (obj->anniversary != NULL) {
+        char* annStr = dateToString(obj->anniversary);
+        if (annStr != NULL && strcmp(annStr, "") != 0) {
+            if (fprintf(fp, "ANNIVERSARY:%s\r\n", annStr) < 0) {
+                free(annStr);
+                fclose(fp);
+                return WRITE_ERROR;
+            }
+            free(annStr);
+        }
+    }
+
+    //Write END:VCARD
+    if (fprintf(fp, "END:VCARD\r\n") < 0) {
+        fclose(fp);
+        return WRITE_ERROR;
+    }
+    //success, now close file and return OK
+    fclose(fp); 
+    return OK;
+}
 
 //reads a vCard file, unfolds any folded lines parses each line, and checks for the required BEGIN, VERSION, END, and FN properties.
 VCardErrorCode createCard(char* fileName, Card** newCardObj) {
