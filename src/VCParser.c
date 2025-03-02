@@ -1,12 +1,149 @@
 /*
     VCParser.c
     Name: Muhammad Ali
-    Student ID: 1115336
 */
 
 //header files
 #include "VCParser.h" //also contains LinkedListAPI.h
 #include "VCHelpers.h"
+
+
+//validates a Card object. If the argument satisfies all Card rules, the function returns OK. Otherwise, the function returns an appropriate error.
+VCardErrorCode validateCard(const Card *obj)
+{
+    /*validate two aspects of the Card struct:
+    * It must match the specification in VCParser.h
+    * It must further validate some - but not all - aspects of the vCard format.
+    */
+    
+    //if card object is NULL return INV_CARD
+    if (obj == NULL)
+    {
+        return INV_CARD;
+    }
+    //validate FN property check that fn || fn->name || fn->values exist and values are nonempty
+    if (obj -> fn == NULL || obj -> fn -> name == NULL || obj -> fn -> values == NULL || getLength(obj -> fn -> values) == 0)
+    {
+        return INV_CARD;
+    }
+    //lowercase fn->name and compare to fn
+    {
+        char fnLowerName[256];
+        int i = 0;
+        while (obj -> fn -> name[i] != '\0' && i < 255)
+        {
+            fnLowerName[i] = tolower(obj -> fn -> name[i]);
+            i++;
+        }
+        fnLowerName[i] = '\0';
+        if (strcmp(fnLowerName, "fn") != 0)
+        {
+            return INV_CARD;
+        }
+    }
+    //validate FN property parameters
+    if (obj -> fn -> parameters != NULL)
+    {
+        ListIterator paramIterator = createIterator(obj -> fn -> parameters);
+        Parameter *param = NULL;
+        while ((param = (Parameter *)nextElement(&paramIterator)) != NULL)
+        {
+            if (param -> value == NULL || strlen(param -> value) == 0 || param -> name == NULL || strlen(param -> name) == 0)
+            {
+                return INV_PROP;
+            }
+        }
+    }
+    //check if optional properties list is initialized
+    if (obj -> optionalProperties == NULL)
+    {
+        return INV_CARD;
+    }
+    int nPropertyOccurrenceCount = 0;
+    ListIterator propertyIterator = createIterator(obj -> optionalProperties);
+    Property *prop = NULL;
+    while ((prop = (Property *)nextElement(&propertyIterator)) != NULL)
+    {
+        if (prop -> name == NULL || strlen(prop -> name) == 0)
+        {
+            return INV_PROP;
+        }
+        //create a lowercase copy of the property name manually
+        char lowerName[256];
+        int j = 0;
+        while (prop -> name[j] != '\0' && j < 255)
+        {
+            lowerName[j] = prop -> name[j];
+            j++;
+        }
+        lowerName[j] = '\0';
+        for (int k = 0; lowerName[k] != '\0'; k++)
+        {
+            lowerName[k] = tolower(lowerName[k]);
+        }
+        //if property name is disallowed return corresponding error using a single compound condition
+        if ((strcmp(lowerName, "version") == 0) || (strcmp(lowerName, "fn") == 0) || (strcmp(lowerName, "bday") == 0) || (strcmp(lowerName, "anniversary") == 0))
+        {
+            return (strcmp(lowerName, "version") == 0) ? INV_CARD : ((strcmp(lowerName, "fn") == 0) ? INV_PROP : INV_DT);
+        }
+        //if property is n it must appear only once and have exactly five values
+        if (strcmp(lowerName, "n") == 0)
+        {
+            nPropertyOccurrenceCount++;
+            if (nPropertyOccurrenceCount > 1 || prop -> values == NULL || getLength(prop -> values) != 5)
+            {
+                return INV_PROP;
+            }
+        }
+        //check that property values list exists and is nonempty
+        if (prop -> values == NULL || getLength(prop -> values) == 0)
+        {
+            return INV_PROP;
+        }
+        ListIterator valueIterator = createIterator(prop -> values);
+        char *valueStr = NULL;
+        while ((valueStr = (char *)nextElement(&valueIterator)) != NULL)
+        {
+            if (valueStr == NULL)
+            {
+                return INV_PROP;
+            }
+        }
+        //validate property parameters if present
+        if (prop -> parameters != NULL)
+        {
+            ListIterator propParamIterator = createIterator(prop -> parameters);
+            Parameter *propParam = NULL;
+            while ((propParam = (Parameter *)nextElement(&propParamIterator)) != NULL)
+            {
+                if (propParam -> name == NULL || strlen(propParam -> name) == 0 || propParam -> value == NULL || strlen(propParam -> value) == 0)
+                {
+                    return INV_PROP;
+                }
+            }
+        }
+    }
+    //inline DateTime validation for birthday using compound condition
+    if (obj -> birthday != NULL)
+    {
+        if ((obj -> birthday -> isText && (obj -> birthday -> date == NULL || obj -> birthday -> time == NULL || obj -> birthday -> text == NULL || strlen(obj -> birthday -> date) != 0 || strlen(obj -> birthday -> time) != 0 || obj -> birthday -> UTC)) ||
+            (!obj -> birthday -> isText && (obj -> birthday -> text == NULL || strlen(obj -> birthday -> text) != 0 || obj -> birthday -> date == NULL || strlen(obj -> birthday -> date) == 0 || obj -> birthday -> time == NULL)))
+        {
+            return INV_DT;
+        }
+    }
+    //inline DateTime validation for anniversary using compound condition
+    if (obj -> anniversary != NULL)
+    {
+        if ((obj -> anniversary -> isText && (obj -> anniversary -> date == NULL || obj -> anniversary -> time == NULL || obj -> anniversary -> text == NULL || strlen(obj -> anniversary -> date) != 0 || strlen(obj -> anniversary -> time) != 0 || obj -> anniversary -> UTC)) ||
+            (!obj -> anniversary -> isText && (obj -> anniversary -> text == NULL || strlen(obj -> anniversary -> text) != 0 || obj -> anniversary -> date == NULL || strlen(obj -> anniversary -> date) == 0 || obj -> anniversary -> time == NULL)))
+        {
+            return INV_DT;
+        }
+    }
+    return OK;
+}
+
 
 //takes a Card object and saves it to a file in vCard format. Avoid calling cardToString because we need to serialize the Card.
 VCardErrorCode writeCard(const char* fileName, const Card* obj) {
@@ -101,6 +238,7 @@ VCardErrorCode writeCard(const char* fileName, const Card* obj) {
     fclose(fp); 
     return OK;
 }
+
 
 //reads a vCard file, unfolds any folded lines parses each line, and checks for the required BEGIN, VERSION, END, and FN properties.
 VCardErrorCode createCard(char* fileName, Card** newCardObj) {
