@@ -8,178 +8,246 @@
 #include "VCHelpers.h"
 
 
-//validates a Card object. If the argument satisfies all Card rules, the function returns OK. Otherwise, the function returns an appropriate error.
+//A2M2: Validates a Card object. Returns OK if card is valid, else returns an error.
 VCardErrorCode validateCard(const Card *obj)
 {
     /*validate two aspects of the Card struct:
     * It must match the specification in VCParser.h
     * It must further validate some - but not all - aspects of the vCard format.
     */
+    //all prop names. considerd putting this in .h file but its fine here for now.
+    char *validPropNames[31] = {
+        "FN", "N", "GENDER", "NICKNAME", "KIND", "PHOTO", "ADR", "TEL", "EMAIL", "IMPP", "LANG", "TZ", "GEO", "TITLE", "ROLE", "LOGO", "ORG", 
+        "MEMBER", "RELATED", "CATEGORIES", "NOTE", "PRODID", "REV",  "SOUND", "UID", "CLIENTPIDMAP", "URL", "KEY", "FBURL", "CALADRURI", "CALURI"
+    };
+
+    //NULL card --> INV CARD
+    if (obj == NULL) {
+        return INV_CARD;
+    }
+    //check fn exist (has 1 value must)
+    if (obj->fn == NULL || obj->fn->name == NULL || obj->fn->values == NULL || getLength(obj->fn->values) == 0) {
+        return INV_CARD;
+    }
     
-    //if card object is NULL return INV_CARD
-    if (obj == NULL)
-    {
+    char fnLowerName[256];    //lowercase copy of fn -> name and check it equals "fn".
+    int i = 0;
+    while (obj->fn->name[i] && i < 255) {
+        fnLowerName[i] = tolower(obj->fn->name[i]);
+        i++;
+    }
+    fnLowerName[i] = '\0';
+    if (strcmp(fnLowerName, "fn") != 0) {
         return INV_CARD;
     }
-    //validate FN property check that fn || fn->name || fn->values exist and values are nonempty
-    if (obj -> fn == NULL || obj -> fn -> name == NULL || obj -> fn -> values == NULL || getLength(obj -> fn -> values) == 0)
+
+    //FN prop check (existing)
+    if (obj->fn->parameters != NULL) 
     {
-        return INV_CARD;
-    }
-    //lowercase fn->name and compare to fn
-    {
-        char fnLowerName[256];
-        int i = 0;
-        while (obj -> fn -> name[i] != '\0' && i < 255)
-        {
-            fnLowerName[i] = tolower(obj -> fn -> name[i]);
-            i++;
-        }
-        fnLowerName[i] = '\0';
-        if (strcmp(fnLowerName, "fn") != 0)
-        {
-            return INV_CARD;
-        }
-    }
-    //validate FN property parameters
-    if (obj -> fn -> parameters != NULL)
-    {
-        ListIterator paramIterator = createIterator(obj -> fn -> parameters);
+        ListIterator paramIterator = createIterator(obj->fn->parameters);
         Parameter *param = NULL;
-        while ((param = (Parameter *)nextElement(&paramIterator)) != NULL)
+        while ((param = (Parameter *)nextElement(&paramIterator)) != NULL) 
         {
-            if (param -> value == NULL || strlen(param -> value) == 0 || param -> name == NULL || strlen(param -> name) == 0)
-            {
+            if (param->name == NULL || param->value == NULL || strlen(param->value) == 0 || strlen(param->name) == 0) {
                 return INV_PROP;
             }
         }
     }
-    //check if optional properties list is initialized
-    if (obj -> optionalProperties == NULL)
-    {
+
+    //check that optionalProperties list is set.
+    if (obj->optionalProperties == NULL) {
         return INV_CARD;
     }
-    int nPropertyOccurrenceCount = 0;
-    ListIterator propertyIterator = createIterator(obj -> optionalProperties);
+
+    int namePropertyOccurrenceCount = 0;
+    int kindPropertyOccurrenceCount = 0; //count for KIND property
+    ListIterator propertyIterator = createIterator(obj->optionalProperties);
     Property *prop = NULL;
-    while ((prop = (Property *)nextElement(&propertyIterator)) != NULL)
+
+    while ((prop = (Property *)nextElement(&propertyIterator)) != NULL) 
     {
-        if (prop -> name == NULL || strlen(prop -> name) == 0)
-        {
+        if (prop -> name == NULL || strlen(prop -> name) == 0) {
             return INV_PROP;
         }
-        //create a lowercase copy of the property name manually
+        //make a lowercase copy of property name.
         char lowerName[256];
         int j = 0;
-        while (prop -> name[j] != '\0' && j < 255)
-        {
-            lowerName[j] = prop -> name[j];
+        while (prop -> name[j] && j < 255) {
+            lowerName[j] = tolower(prop->name[j]);
             j++;
         }
         lowerName[j] = '\0';
-        for (int k = 0; lowerName[k] != '\0'; k++)
+        
+        //DONT allow these property names.
+        if ((strcmp(lowerName, "version") == 0) || (strcmp(lowerName, "fn") == 0) ||  (strcmp(lowerName, "bday") == 0) ||  (strcmp(lowerName, "anniversary") == 0)) 
         {
-            lowerName[k] = tolower(lowerName[k]);
-        }
-        //if property name is disallowed return corresponding error using a single compound condition
-        if ((strcmp(lowerName, "version") == 0) || (strcmp(lowerName, "fn") == 0) || (strcmp(lowerName, "bday") == 0) || (strcmp(lowerName, "anniversary") == 0))
-        {
-            return (strcmp(lowerName, "version") == 0) ? INV_CARD : ((strcmp(lowerName, "fn") == 0) ? INV_PROP : INV_DT);
-        }
-        //if property is n it must appear only once and have exactly five values
-        if (strcmp(lowerName, "n") == 0)
-        {
-            nPropertyOccurrenceCount++;
-            if (nPropertyOccurrenceCount > 1 || prop -> values == NULL || getLength(prop -> values) != 5)
-            {
+            if (strcmp(lowerName, "version") == 0) {
+                return INV_CARD;
+            }
+            if (strcmp(lowerName, "fn") == 0) {
                 return INV_PROP;
             }
+            return INV_DT;
         }
-        //check that property values list exists and is nonempty
-        if (prop -> values == NULL || getLength(prop -> values) == 0)
+
+        //checks if property name is allowed
+        int allowed = 0;
+        for (int k = 0; k < NUMBER_OF_PROPERTIES; k++) 
         {
+            char lowerValid[256];
+            int idx = 0;
+            //lowercase them.
+            while (validPropNames[k][idx] && idx < 255) 
+            {
+                lowerValid[idx] = tolower(validPropNames[k][idx]);
+                idx++;
+            }
+            lowerValid[idx] = '\0';
+            if (strcmp(lowerName, lowerValid) == 0) 
+            {
+                allowed = 1;
+                break;
+            }
+        }
+        if (!allowed) {
             return INV_PROP;
         }
-        ListIterator valueIterator = createIterator(prop -> values);
-        char *valueStr = NULL;
-        while ((valueStr = (char *)nextElement(&valueIterator)) != NULL)
+        
+        //for property n  appear once and have exact 5 val
+        if (strcmp(lowerName, "n") == 0) 
         {
-            if (valueStr == NULL)
-            {
+            namePropertyOccurrenceCount++;
+            if (namePropertyOccurrenceCount > 1 || prop->values == NULL || getLength(prop -> values) != 5) {
                 return INV_PROP;
             }
         }
-        //validate property parameters if present
-        if (prop -> parameters != NULL)
+        //proper kind canonly appear once
+        if (strcmp(lowerName, "kind") == 0) 
         {
-            ListIterator propParamIterator = createIterator(prop -> parameters);
+            kindPropertyOccurrenceCount++;
+            if (kindPropertyOccurrenceCount > 1) {
+                return INV_PROP;
+            }
+        }
+        //makes sure property has a nonempty list of values.
+        if (prop->values == NULL || getLength(prop->values) == 0) {
+            return INV_PROP;
+        }
+        ListIterator valueIterator = createIterator(prop->values);
+        char *valueStr = NULL;
+        while ((valueStr = (char *)nextElement(&valueIterator)) != NULL) 
+        {
+            if (valueStr == NULL) {
+                return INV_PROP;
+            }
+        }
+        //check property parameters if they exist.
+        if (prop->parameters != NULL) 
+        {
+            ListIterator propParamIterator = createIterator(prop->parameters);
             Parameter *propParam = NULL;
-            while ((propParam = (Parameter *)nextElement(&propParamIterator)) != NULL)
-            {
-                if (propParam -> name == NULL || strlen(propParam -> name) == 0 || propParam -> value == NULL || strlen(propParam -> value) == 0)
-                {
+            while ((propParam = (Parameter *)nextElement(&propParamIterator)) != NULL) {
+                if (propParam->name == NULL || strlen(propParam->name) == 0 ||
+                    propParam->value == NULL || strlen(propParam->value) == 0) {
                     return INV_PROP;
                 }
             }
         }
     }
-    //inline DateTime validation for birthday using compound condition
-    if (obj -> birthday != NULL)
+
+    //val birthday DateTime (existing.)
+    if (obj->birthday != NULL) 
     {
-        if ((obj -> birthday -> isText && (obj -> birthday -> date == NULL || obj -> birthday -> time == NULL || obj -> birthday -> text == NULL || strlen(obj -> birthday -> date) != 0 || strlen(obj -> birthday -> time) != 0 || obj -> birthday -> UTC)) ||
-            (!obj -> birthday -> isText && (obj -> birthday -> text == NULL || strlen(obj -> birthday -> text) != 0 || obj -> birthday -> date == NULL || strlen(obj -> birthday -> date) == 0 || obj -> birthday -> time == NULL)))
+        if (obj->birthday->isText) 
         {
-            return INV_DT;
+            //Text DateTime ONLY TEXT and no date or time, and UTC must be false.
+            if (obj->birthday->text == NULL || strlen(obj->birthday->text) == 0) {
+                return INV_DT;
+            }
+            if ((obj->birthday->date != NULL && strlen(obj->birthday->date) > 0) || (obj->birthday->time != NULL && strlen(obj->birthday->time) > 0) ||obj->birthday->UTC) {
+                return INV_DT;
+            }
+        } 
+        else 
+        {
+            //structed DateTime must not have text and ONLY date or time.
+            if (obj->birthday->text != NULL && strlen(obj->birthday->text) > 0) {
+                return INV_DT;
+            }
+            int dateEmpty = (obj->birthday->date == NULL || strlen(obj->birthday->date) == 0);
+            int timeEmpty = (obj->birthday->time == NULL || strlen(obj->birthday->time) == 0);
+            if (dateEmpty && timeEmpty) {
+                return INV_DT;
+            }
         }
     }
-    //inline DateTime validation for anniversary using compound condition
-    if (obj -> anniversary != NULL)
+    //val anniversary DateTime (if exist)
+    if (obj->anniversary != NULL) 
     {
-        if ((obj -> anniversary -> isText && (obj -> anniversary -> date == NULL || obj -> anniversary -> time == NULL || obj -> anniversary -> text == NULL || strlen(obj -> anniversary -> date) != 0 || strlen(obj -> anniversary -> time) != 0 || obj -> anniversary -> UTC)) ||
-            (!obj -> anniversary -> isText && (obj -> anniversary -> text == NULL || strlen(obj -> anniversary -> text) != 0 || obj -> anniversary -> date == NULL || strlen(obj -> anniversary -> date) == 0 || obj -> anniversary -> time == NULL)))
+        if (obj->anniversary->isText) 
         {
-            return INV_DT;
+            //txt DateTime must have txt, and no date or time, and UTC FALSE.
+            if (obj->anniversary->text == NULL || strlen(obj->anniversary->text) == 0) {
+                return INV_DT;
+            }
+            if ((obj->anniversary->date != NULL && strlen(obj->anniversary->date) > 0) ||  (obj->anniversary->time != NULL && strlen(obj->anniversary->time) > 0) || obj->anniversary->UTC) {
+                return INV_DT;
+            }
+        } 
+        else 
+        {
+            //structed DateTime must not have text and must have a date or time.
+            if (obj -> anniversary->text != NULL && strlen(obj->anniversary->text) > 0) {
+                return INV_DT;
+            }
+            int dateEmpty = (obj->anniversary->date == NULL || strlen(obj->anniversary->date) == 0);
+            int timeEmpty = (obj->anniversary->time == NULL || strlen(obj->anniversary->time) == 0);
+            if (dateEmpty && timeEmpty) {
+                return INV_DT;
+            }
         }
     }
     return OK;
 }
 
-
-//takes a Card object and saves it to a file in vCard format. Avoid calling cardToString because we need to serialize the Card.
-VCardErrorCode writeCard(const char* fileName, const Card* obj) {
-    //validate args
-    if (fileName == NULL || obj == NULL) {
-        return INV_CARD;
+//A2M1: Writes a Card object to a file in vCard format. Do not use cardToString.
+VCardErrorCode writeCard(const char* fileName, const Card* obj) 
+{
+    //check fileName NULL MEANS return WRITE_ERROR.
+    if (fileName == NULL) {
+        return WRITE_ERROR;
     }
-
-    //open file
+    //check card. NULL MEANS return WRITE_ERROR.
+    if (obj == NULL) {
+        return WRITE_ERROR;
+    }
+    
+    //open file in w
     FILE* fp = fopen(fileName, "w");
     if (fp == NULL) {
-        return WRITE_ERROR;  //couldn't open file for writing
+        return OTHER_ERROR; //file open error.
     }
-
-    //Card must haveFN with at least one value
-    if (obj->fn == NULL || getLength(obj->fn->values) == 0) {
+    
+    //card must have an FN ww/ atleast 1 val
+    if (obj->fn == NULL || getLength(obj -> fn -> values) == 0) {
         fclose(fp);
         return INV_CARD;
     }
-
-    //write vCard lines (using fprintf, with \r\n line endings)
+    
+    //write BEGIN and VERSION lines.
     if (fprintf(fp, "BEGIN:VCARD\r\n") < 0) {
         fclose(fp);
         return WRITE_ERROR;
     }
-
-    //Write VERSION line 4.0
     if (fprintf(fp, "VERSION:4.0\r\n") < 0) {
         fclose(fp);
         return WRITE_ERROR;
     }
-
-    //Write FN property
-    char* fnValueString = (char*)getFromFront(obj->fn->values);
-    //if fn is empty INVALID
-    if (fnValueString == NULL || strcmp(fnValueString, "") == 0) {
+    
+    //FN property.
+    char* fnValueString = (char*)getFromFront(obj -> fn ->values);
+    if (fnValueString == NULL || strcmp(fnValueString, "") == 0) 
+    {
         fclose(fp);
         return INV_CARD;
     }
@@ -187,14 +255,16 @@ VCardErrorCode writeCard(const char* fileName, const Card* obj) {
         fclose(fp);
         return WRITE_ERROR;
     }
-
-    //optional properties
-    ListIterator propIter = createIterator(obj->optionalProperties);
+    
+    //opt properties.
+    ListIterator propIter = createIterator(obj -> optionalProperties);
     Property* prop = NULL;
-    while ((prop = (Property*)nextElement(&propIter)) != NULL) {
+    while ((prop = (Property*)nextElement(&propIter)) != NULL) 
+    {
         char* propStr = propertyToString(prop);
         if (propStr != NULL) {
-            if (fprintf(fp, "%s\r\n", propStr) < 0) {
+            if (fprintf(fp, "%s\r\n", propStr) < 0) 
+            {
                 free(propStr);
                 fclose(fp);
                 return WRITE_ERROR;
@@ -202,46 +272,115 @@ VCardErrorCode writeCard(const char* fileName, const Card* obj) {
             free(propStr);
         }
     }
-
-    //Write birthday (if existing)
-    if (obj->birthday != NULL) {
-        char* bdayStr = dateToString(obj->birthday);
-        if (bdayStr != NULL && strcmp(bdayStr, "") != 0) {
-            if (fprintf(fp, "BDAY:%s\r\n", bdayStr) < 0) {
-                free(bdayStr);
-                fclose(fp);
-                return WRITE_ERROR;
+    
+    //birthday.
+    if (obj -> birthday != NULL) 
+    {
+        if (obj->birthday->isText) 
+        {
+            //For text DateTime, use VALUE=text.
+            if (obj->birthday->text != NULL && strlen(obj-> birthday -> text) > 0) 
+            {
+                if (fprintf(fp, "BDAY;VALUE=text:%s\r\n", obj-> birthday -> text) < 0) 
+                {
+                    fclose(fp);
+                    return WRITE_ERROR;
+                }
             }
-            free(bdayStr);
+        } 
+        else 
+        {
+            //for structed datetime make str from date/time
+            char dtStr[256] = "";
+            int hasDate = (obj -> birthday -> date != NULL && strlen(obj-> birthday ->date) > 0);
+            int hasTime = (obj ->birthday-> time != NULL && strlen(obj -> birthday -> time) > 0);
+            if (hasDate) 
+            {
+                strcpy(dtStr, obj->birthday->date);
+                if (hasTime)
+                {
+                    strcat(dtStr, "T");
+                    strcat(dtStr, obj->birthday->time);
+                    if (obj->birthday->UTC) {
+                        strcat(dtStr, "Z");
+                    }
+                }
+            } 
+            else if (hasTime) 
+            {
+                //TIMEONLY output with lead 'T"
+                strcpy(dtStr, "T");
+                strcat(dtStr, obj->birthday->time);
+            }
+            if (strlen(dtStr) > 0) 
+            {
+                if (fprintf(fp, "BDAY:%s\r\n", dtStr) < 0) {
+                    fclose(fp);
+                    return WRITE_ERROR;
+                }
+            }
         }
     }
-
-    //write Anniversary (if existing)
-    if (obj->anniversary != NULL) {
-        char* annStr = dateToString(obj->anniversary);
-        if (annStr != NULL && strcmp(annStr, "") != 0) {
-            if (fprintf(fp, "ANNIVERSARY:%s\r\n", annStr) < 0) {
-                free(annStr);
-                fclose(fp);
-                return WRITE_ERROR;
+    
+    //anniversaire.
+    if (obj->anniversary != NULL) 
+    {
+        if (obj->anniversary->isText) 
+        {
+            if (obj->anniversary->text != NULL && strlen(obj -> anniversary-> text) > 0) 
+            {
+                if (fprintf(fp, "ANNIVERSARY;VALUE=text:%s\r\n", obj->anniversary->text) < 0) 
+                {
+                    fclose(fp);
+                    return WRITE_ERROR;
+                }
             }
-            free(annStr);
+        } 
+        else 
+        {
+            char annStr[256] = "";
+            int hasDate = (obj->anniversary->date != NULL && strlen(obj -> anniversary->date) > 0);
+            int hasTime = (obj->anniversary->time != NULL && strlen(obj->anniversary->time) > 0);
+            if (hasDate) 
+            {
+                strcpy(annStr, obj->anniversary->date);
+                if (hasTime) {
+                    strcat(annStr, "T");
+                    strcat(annStr, obj->anniversary->time);
+                    if (obj->anniversary->UTC) {
+                        strcat(annStr, "Z");
+                    }
+                }
+            } 
+            else if (hasTime) {
+                strcpy(annStr, obj->anniversary->time);
+            }
+            if (strlen(annStr) > 0) 
+            {
+                if (fprintf(fp, "ANNIVERSARY:%s\r\n", annStr) < 0) 
+                {
+                    fclose(fp);
+                    return WRITE_ERROR;
+                }
+            }
         }
     }
-
-    //Write END:VCARD
-    if (fprintf(fp, "END:VCARD\r\n") < 0) {
+    
+    //Write footer.
+    if (fprintf(fp, "END:VCARD\r\n") < 0) 
+    {
         fclose(fp);
         return WRITE_ERROR;
     }
-    //success, now close file and return OK
-    fclose(fp); 
+    
+    fclose(fp);
     return OK;
 }
 
 
-//reads a vCard file, unfolds any folded lines parses each line, and checks for the required BEGIN, VERSION, END, and FN properties.
-VCardErrorCode createCard(char* fileName, Card** newCardObj) {
+//reads a vCard file, unfolds any folded lines parses each line, and checks for required BEGIN, VERSION, END, and FN properties.
+VCardErrorCode createCard(char* fileName, Card** newCardObj) 
+{
     //checks if the newCardObj pointer is NULL which if it return an invalid file error.
     if (newCardObj == NULL) {
         return INV_FILE;
@@ -258,7 +397,8 @@ VCardErrorCode createCard(char* fileName, Card** newCardObj) {
     //find last dot in the file name to locate the extension.
     for (int i = fileNameLength - 1; i >= 0; i--) 
     {
-        if (fileName[i] == '.') {
+        if (fileName[i] == '.') 
+        {
             dotIndex = i;
             break;
         }
@@ -317,29 +457,30 @@ VCardErrorCode createCard(char* fileName, Card** newCardObj) {
         return OTHER_ERROR;
     }
 
-    bool foundBegin = false, foundEnd = false, foundVersion = false, foundFn = false; //flags to track  required properties
+    bool foundBegin = false, foundEnd = false, foundVersion = false, foundFn = false; //flags to track req properties
     VCardErrorCode lastErr = OK; //variable for the last error.
 
     char lineBuffer[2048] = "";    //buffer to store unfolded lines
     int currentBufferLength = 0; //counter for the current buffer length.
 
     //Read every line of the file.
-    while (!feof(fp)) {
+    while (!feof(fp)) 
+    {
         char inputLine[1024];
         inputLine[0] = '\0';
         if (fgets(inputLine, sizeof(inputLine), fp) == NULL) {
             break;
         }
         //check if line contains \r (Carriage return - go to start of line). if not, close file, delete the card, and return an error.
-        if (strchr(inputLine, '\r') == NULL) 
-        {
+        if (strchr(inputLine, '\r') == NULL) {
             fclose(fp);
             deleteCard(cardObj);
             return INV_CARD;
         }
         //remove \n and \r (carriage return) from the end of the line.
         int inputLineLength = (int)strlen(inputLine);
-        while (inputLineLength > 0 && (inputLine[inputLineLength - 1] == '\n' || inputLine[inputLineLength - 1] == '\r')) {
+        while (inputLineLength > 0 && (inputLine[inputLineLength - 1] == '\n' || inputLine[inputLineLength - 1] == '\r')) 
+        {
             inputLine[inputLineLength - 1] = '\0';
             inputLineLength--;
         }
@@ -348,20 +489,25 @@ VCardErrorCode createCard(char* fileName, Card** newCardObj) {
             continue;
         }
         //check if the line starts with space or tab.
+        //CASE lineunfold1 and lineunfold2: make sure it parses right no matter how it appears.
         if (inputLine[0] == ' ' || inputLine[0] == '\t') 
         {
-            //skip first whitespce
             int skipCount = 0;
+            //count all leading whitespace chars
             while (inputLine[skipCount] == ' ' || inputLine[skipCount] == '\t') {
                 skipCount++;
             }
-            //append  rest of the line to the lineBuffer.
+            //append any extra whitespace beyond first char PRESERVE INTENDED SPACES
+            for (int i = 1; i < skipCount && currentBufferLength < 2047; i++) {
+                lineBuffer[currentBufferLength++] = inputLine[i];
+            }
+            //append the rest of the line starting at the char after the 1st whitespace
             int copyIndex = skipCount;
             while (inputLine[copyIndex] != '\0' && currentBufferLength < 2047) {
                 lineBuffer[currentBufferLength++] = inputLine[copyIndex++];
             }
             lineBuffer[currentBufferLength] = '\0';
-        } 
+        }
         else 
         {
             //process data in lineBuffer from prev unfolded lines
@@ -400,7 +546,8 @@ VCardErrorCode createCard(char* fileName, Card** newCardObj) {
     {
         parseLine(cardObj,lineBuffer, &foundBegin,&foundEnd,  &foundVersion, &foundFn, &lastErr, newCardObj);
         //if parsing returns error, close file and return error.
-        if (lastErr != OK) {
+        if (lastErr != OK) 
+        {
             fclose(fp);
             return lastErr;
         }
@@ -424,6 +571,7 @@ VCardErrorCode createCard(char* fileName, Card** newCardObj) {
     *newCardObj = cardObj;   //set newCardObj to successfully created card 
     return OK; //return success if everything went well
 }
+
 
 
 //deletecard: free all memory allocated for the Card.
@@ -553,3 +701,4 @@ char* errorToString(VCardErrorCode err)
     }
     return returnMessage;
 }
+
