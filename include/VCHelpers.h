@@ -1,7 +1,10 @@
 /*
     VCHelpers.h
+    Name: Muhammad Ali
+    Student ID: 1115336
 */
 
+#define NUMBER_OF_PROPERTIES 31
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
@@ -35,3 +38,5 @@ char* dateToString(void* date);
 void trimString(char* str);
 DateTime* parseDateTime(const char* rawStr);
 void parseLine(Card* cardObj,char* lineStr,bool* foundBegin,bool* foundEnd,bool* foundVersion,bool* foundFn,VCardErrorCode* lastError,Card** newCardObj);
+char* serializeProperty(Property* prop);
+

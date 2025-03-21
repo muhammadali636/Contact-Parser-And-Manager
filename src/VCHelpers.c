@@ -1,6 +1,7 @@
 /*
  * vchelpers.c
- * helper functions for parsing
+ * name: Muhammad Ali
+ * Student ID: 1115336
  */
 
 //header files
@@ -105,7 +106,7 @@ int compareProperties(const void* first, const void* second) {
     return property1->name[index] - property2->name[index];    //ret the difference in lengths 
 }
 
-//change a prop to a str 
+//change a prop to a str in proper vCard format
 char* propertyToString(void* prop) {
     //if prop pointer is NULL ret a default string
     if (!prop) {
@@ -121,64 +122,51 @@ char* propertyToString(void* prop) {
     }
 
     Property* propertyPtr = (Property*)prop; //input ptr to a prop ptr and 
-    char buffer[512] = ""; //create a buffer for the string
+    char buffer[1024] = ""; //create a buffer for the string
 
     //BUILDING header str
-    //group exists, include it in the string.
-    if (propertyPtr->group && strlen(propertyPtr->group) > 0) {
-        strcpy(buffer, "Group: ");
-        strcat(buffer, propertyPtr->group);
-        strcat(buffer, ", Property: ");
-        if (propertyPtr->name) {
-            strcat(buffer, propertyPtr->name);
-        } 
-        else {
-            strcat(buffer, "(no name)");
-        }
+    //start directly with the property name.
+    if (propertyPtr->name) {
+        strcpy(buffer, propertyPtr->name);
     } 
     //append the prop name if it doesn't exist. 
     else {
-        strcpy(buffer, "Property: ");
-        if (propertyPtr->name) {
-            strcat(buffer, propertyPtr->name);
-        } 
-        else {
-            strcat(buffer, "(no name)");
-        }
+        strcpy(buffer, "(no name)");
     }
 
-    ///append param to str (if exists)
+    ///append param to str (if exists) in proper vCard format: ;paramName=paramValue
     if (propertyPtr->parameters && getLength(propertyPtr->parameters) > 0) {
-        strcat(buffer, " Parameters: ");
         ListIterator iterator = createIterator(propertyPtr->parameters);
         void* parameterData = nextElement(&iterator);
         while (parameterData) {
             Parameter* parameterPtr = (Parameter*)parameterData;
-            char* parameterStr = parameterToString(parameterPtr);
-            strcat(buffer, parameterStr);
-            free(parameterStr);
+            strcat(buffer, ";");
+            strcat(buffer, parameterPtr->name);
+            strcat(buffer, "=");
+            strcat(buffer, parameterPtr->value);
             parameterData = nextElement(&iterator);
-            if (parameterData) {
-                strcat(buffer, ", ");
-            }
         }
     }
 
-    //append val to str
-    strcat(buffer, " Values: ");
+    strcat(buffer, ":");    //append colon to separate header from values
+
+    //append val to str in proper vCard format (separate multiple values with semicolons)
     if (propertyPtr->values && getLength(propertyPtr->values) > 0) {
         ListIterator valueIterator = createIterator(propertyPtr->values);
         void* valueData = nextElement(&valueIterator);
+        bool first = true;
         while (valueData) {
             char* valueStr = (char*)valueData;
-            strcat(buffer, "\"");
+            if (!first) {
+                strcat(buffer, ";");
+            }
             strcat(buffer, valueStr);
-            strcat(buffer, "\" ");
+            first = false;
             valueData = nextElement(&valueIterator);
         }
     } 
     else {
-        strcat(buffer, "(no values)");
+        strcat(buffer, "");
     }
 
     //alloc mem for resulting str
@@ -192,6 +180,7 @@ char* propertyToString(void* prop) {
     }
     return retStr; //ret resulting str
 }
+
 
 //PARAMS
 //free ALL mem allocated for a Parameter structure 
@@ -1263,3 +1252,5 @@ void parseLine(Card* cardObj, char* lineStr, bool* foundBegin, bool* foundEnd, b
     insertBack(cardObj->optionalProperties, newProperty); //add the new property to the card object list of optional properties
 
 }
+
+
