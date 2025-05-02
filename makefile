@@ -1,5 +1,6 @@
 # Makefile
 # Muhammad Ali
+# Student ID: 1115336
 
 CC = gcc
 CFLAGS = -Wall -std=c11 -g
@@ -28,9 +29,9 @@ $(BIN)LinkedListAPI.o: $(SRC)LinkedListAPI.c $(INC)LinkedListAPI.h
 
 main: $(BIN)main
 
-$(BIN)main: $(BIN)main.o $(BIN)libvcparser.so
+$(BIN)main: $(BIN)main.o $(BIN)VCParser.o $(BIN)VCHelpers.o $(BIN)LinkedListAPI.o
 	mkdir -p $(BIN)
-	$(CC) $(CFLAGS) -o $(BIN)main $(BIN)main.o $(BIN)libvcparser.so
+	$(CC) $(CFLAGS) -o $(BIN)main $(BIN)main.o $(BIN)VCParser.o $(BIN)VCHelpers.o $(BIN)LinkedListAPI.o
 
 $(BIN)main.o: $(SRC)main.c 
 	mkdir -p $(BIN)
