@@ -1,5 +1,5 @@
 /*
-    VCParser.c
+    VCParser.c: main parsing functions
     Name: Muhammad Ali
     Student ID: 1115336
 */

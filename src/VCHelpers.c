@@ -1,5 +1,5 @@
 /*
- * vchelpers.c
+ * vchelpers.c: helper functions
  * name: Muhammad Ali
  * Student ID: 1115336
  */

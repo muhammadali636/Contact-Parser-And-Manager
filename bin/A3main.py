@@ -1,3 +1,8 @@
+'''
+    A3main.py
+    frontend python code - old school terminal style.
+    calls C functions in src folder and connects to MySQL database
+'''
 #!/usr/bin/env python3 - I can still do python 3
 #REFER asciimatics github
 from asciimatics.widgets import Frame, ListBox, Layout, Divider, Text, Button, TextBox, Widget, Label

@@ -1,8 +1,6 @@
 /*  
-    UPLOAD TO GITHUB
-    FOR TESTING. NOT TO SUBMIT.
     Name: Muhammad Ali
-    main.c: Driver to test createCard, cardToString, errorToString, deleteCard, and validateCard
+    main.c: Driver to test functions
 */
 
 #include <stdio.h>
@@ -11,11 +9,11 @@
 #include "VCHelpers.h"
 
 int main(void) {
-    char* filename = "cards/testCardGroup.vcf";  // Fixed: Added missing semicolon
+    char* filename = "cards/testCardGroup.vcf";   //change this to whatever file to test.
 
-    // Parse the input vCard file
+    //parse the input vCard file
     Card* myCard = NULL;
-    VCardErrorCode result = createCard(filename, &myCard);
+    VCardErrorCode result = createCard(filename, &myCard); 
     
     if (result != OK) {
         char* errStr = errorToString(result);
@@ -26,7 +24,7 @@ int main(void) {
 
     printf("Successfully parsed vCard from %s\n", filename);
 
-    // Validate the parsed vCard
+    //validate parsed vCard
     result = validateCard(myCard);
     if (result != OK) {
         char* errStr = errorToString(result);
@@ -37,7 +35,7 @@ int main(void) {
     }
     printf("vCard is valid.\n");
 
-    // Write the validated vCard to the output file
+    //write the validated vCard to the output file
     result = writeCard(filename, myCard);
     if (result != OK) {
         char* errStr = errorToString(result);
@@ -49,7 +47,7 @@ int main(void) {
 
     printf("Successfully wrote vCard to %s\n", filename);
 
-    // Clean up
+    //clean up
     deleteCard(myCard);
     return 0;
 }
